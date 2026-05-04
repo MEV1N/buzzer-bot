@@ -103,7 +103,7 @@ class XP(commands.Cog):
 
     # ── /rank ─────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='rank', description="Check your XP rank (or another user's).")
+    @app_commands.command(name='bzrank', description="Check your XP rank (or another user's).")
     @app_commands.describe(user='The user to check (defaults to you)')
     async def rank(self, interaction: discord.Interaction, user: discord.Member = None):
         await interaction.response.defer()
@@ -136,7 +136,7 @@ class XP(commands.Cog):
 
     # ── /leaderboard ──────────────────────────────────────────────────────────
 
-    @app_commands.command(name='leaderboard', description='View the top XP earners in this server.')
+    @app_commands.command(name='bzleaderboard', description='View the top XP earners in this server.')
     @app_commands.describe(limit='How many users to show (1–20, default 10)')
     async def leaderboard(self, interaction: discord.Interaction, limit: int = 10):
         await interaction.response.defer()

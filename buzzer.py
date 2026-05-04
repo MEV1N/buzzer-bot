@@ -70,6 +70,7 @@ class BuzzerBot(commands.Bot):
             'cogs.xp',
             'cogs.moderation',
             'cogs.tasks',
+            'cogs.help',
         ]
         for cog in cogs:
             try:
