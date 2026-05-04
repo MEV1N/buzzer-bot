@@ -48,7 +48,7 @@ class Tasks(commands.Cog):
 
     # ── /task group ───────────────────────────────────────────────────────────
 
-    task_group = app_commands.Group(name='task', description='Task management commands.')
+    task_group = app_commands.Group(name='bztask', description='Task management commands.')
 
     # ── /task assign ──────────────────────────────────────────────────────────
 

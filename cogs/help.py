@@ -20,10 +20,10 @@ CATEGORIES = {
         'color':  COLORS['xp'],
         'desc':   'Earn XP by chatting. Level up automatically.',
         'commands': [
-            ('/rank',              'Show your XP rank card.',                  'Anyone'),
-            ('/rank @user',        'Show another user\'s rank card.',          'Anyone'),
-            ('/leaderboard',       'Top 10 XP earners in this server.',        'Anyone'),
-            ('/leaderboard limit', 'Show top N users (1–20).',                 'Anyone'),
+            ('/bzrank',              'Show your XP rank card.',                  'Anyone'),
+            ('/bzrank @user',        'Show another user\'s rank card.',          'Anyone'),
+            ('/bzleaderboard',       'Top 10 XP earners in this server.',        'Anyone'),
+            ('/bzleaderboard limit', 'Show top N users (1–20).',                 'Anyone'),
         ],
     },
     'tasks': {
@@ -31,10 +31,10 @@ CATEGORIES = {
         'color':  COLORS['task'],
         'desc':   'Assign, track, and complete tasks with proof.',
         'commands': [
-            ('/task assign @user title due remind', 'Assign a task to a member.',              'Admin+'),
-            ('/task update taskId message',         'Post a status update on a task.',         'Assignee / Admin'),
-            ('/task complete taskId proof',         'Mark a task done. Proof URL required.',   'Assignee only'),
-            ('/task my',                            'List all tasks assigned to you.',          'Anyone'),
+            ('/bztask assign @user title due remind', 'Assign a task to a member.',              'Admin+'),
+            ('/bztask update taskId message',         'Post a status update on a task.',         'Assignee / Admin'),
+            ('/bztask complete taskId proof',         'Mark a task done. Proof URL required.',   'Assignee only'),
+            ('/bztask my',                            'List all tasks assigned to you.',          'Anyone'),
         ],
     },
     'moderation': {
@@ -42,14 +42,14 @@ CATEGORIES = {
         'color':  COLORS['mod'],
         'desc':   'Custom permission system — independent of Discord roles.',
         'commands': [
-            ('/warn @user reason',    'Issue a warning.',                         'Admin+'),
-            ('/mute @user dur reason','Timeout a member (e.g. 10m, 2h, 1d).',    'Admin+'),
-            ('/kick @user reason',    'Kick a member from the server.',           'Admin+'),
-            ('/ban @user reason',     'Ban a member from the server.',            'Owner only'),
-            ('/resetxp @user',        'Reset a user\'s XP and level to 0.',      'Owner only'),
-            ('/promote @user',        'Grant Core Admin role to a member.',       'Owner only'),
-            ('/demote @user',         'Remove Core Admin role from a member.',    'Owner only'),
-            ('/deletetask taskId',    'Permanently delete a task.',               'Owner only'),
+            ('/bzwarn @user reason',    'Issue a warning.',                         'Admin+'),
+            ('/bzmute @user dur reason','Timeout a member (e.g. 10m, 2h, 1d).',    'Admin+'),
+            ('/bzkick @user reason',    'Kick a member from the server.',           'Admin+'),
+            ('/bzban @user reason',     'Ban a member from the server.',            'Owner only'),
+            ('/bzresetxp @user',        'Reset a user\'s XP and level to 0.',      'Owner only'),
+            ('/bzpromote @user',        'Grant Core Admin role to a member.',       'Owner only'),
+            ('/bzdemote @user',         'Remove Core Admin role from a member.',    'Owner only'),
+            ('/bzdeletetask taskId',    'Permanently delete a task.',               'Owner only'),
         ],
     },
     'attendance': {
@@ -151,7 +151,7 @@ class Help(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name='help', description='Show all Buzzer commands and how to use them.')
+    @app_commands.command(name='bzhelp', description='Show all Buzzer commands and how to use them.')
     @app_commands.describe(category='Drill into a specific category (optional)')
     @app_commands.choices(category=CATEGORY_CHOICES)
     async def help(

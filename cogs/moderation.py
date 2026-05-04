@@ -118,7 +118,7 @@ class Moderation(commands.Cog):
     # ADMIN+ COMMANDS
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='warn', description='Issue a warning to a member. [Admin+]')
+    @app_commands.command(name='bzwarn', description='Issue a warning to a member. [Admin+]')
     @app_commands.describe(user='The member to warn', reason='Reason for the warning')
     async def warn(self, interaction: discord.Interaction, user: discord.Member, reason: str):
         await interaction.response.defer(ephemeral=True)
@@ -167,7 +167,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='mute', description='Timeout a member for a duration. [Admin+]')
+    @app_commands.command(name='bzmute', description='Timeout a member for a duration. [Admin+]')
     @app_commands.describe(user='The member to mute', duration='Duration e.g. 10m, 2h, 1d', reason='Reason')
     async def mute(self, interaction: discord.Interaction, user: discord.Member, duration: str, reason: str = 'No reason provided.'):
         await interaction.response.defer(ephemeral=True)
@@ -220,7 +220,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='kick', description='Kick a member from the server. [Admin+]')
+    @app_commands.command(name='bzkick', description='Kick a member from the server. [Admin+]')
     @app_commands.describe(user='The member to kick', reason='Reason for the kick')
     async def kick(self, interaction: discord.Interaction, user: discord.Member, reason: str = 'No reason provided.'):
         await interaction.response.defer(ephemeral=True)
@@ -258,7 +258,7 @@ class Moderation(commands.Cog):
     # OWNER-ONLY COMMANDS
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='ban', description='Ban a member from the server. [Owner only]')
+    @app_commands.command(name='bzban', description='Ban a member from the server. [Owner only]')
     @app_commands.describe(user='The member to ban', reason='Reason for the ban')
     async def ban(self, interaction: discord.Interaction, user: discord.Member, reason: str = 'No reason provided.'):
         await interaction.response.defer(ephemeral=True)
@@ -290,7 +290,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='resetxp', description="Reset a user's XP and level to 0. [Owner only]")
+    @app_commands.command(name='bzresetxp', description="Reset a user's XP and level to 0. [Owner only]")
     @app_commands.describe(user='The user whose XP to reset')
     async def resetxp(self, interaction: discord.Interaction, user: discord.User):
         await interaction.response.defer(ephemeral=True)
@@ -316,7 +316,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='promote', description='Promote a member to Core Admin. [Owner only]')
+    @app_commands.command(name='bzpromote', description='Promote a member to Core Admin. [Owner only]')
     @app_commands.describe(user='The member to promote')
     async def promote(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
@@ -347,7 +347,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='demote', description='Demote a Core Admin back to Member. [Owner only]')
+    @app_commands.command(name='bzdemote', description='Demote a Core Admin back to Member. [Owner only]')
     @app_commands.describe(user='The admin to demote')
     async def demote(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
@@ -382,7 +382,7 @@ class Moderation(commands.Cog):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    @app_commands.command(name='deletetask', description='Delete a task by ID. [Owner only]')
+    @app_commands.command(name='bzdeletetask', description='Delete a task by ID. [Owner only]')
     @app_commands.describe(task_id='The task ID to delete (e.g. TASK-ABC123)')
     async def deletetask(self, interaction: discord.Interaction, task_id: str):
         await interaction.response.defer(ephemeral=True)
