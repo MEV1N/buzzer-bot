@@ -84,19 +84,19 @@ class BuzzerBot(commands.Bot):
                 print(f'[COG]   Failed to load {cog}: {e}')
 
         # ── Sync slash commands to Discord ────────────────────────────────────
-        # Syncs globally; may take up to 1 hour to propagate to all servers.
-        # For instant testing on a single guild, uncomment the guild-specific sync below.
+        # Global sync runs always (for servers added later).
+        # Guild-specific sync runs instantly on restart for the dev/main server.
         try:
             synced = await self.tree.sync()
             print(f'[SYNC]  Synced {len(synced)} slash command(s) globally.')
 
-            # --- Uncomment for instant guild-specific sync during development ---
-            # GUILD_ID = os.getenv('GUILD_ID')
-            # if GUILD_ID:
-            #     guild = discord.Object(id=int(GUILD_ID))
-            #     self.tree.copy_global_to(guild=guild)
-            #     await self.tree.sync(guild=guild)
-            #     print(f'[SYNC]  Synced to guild {GUILD_ID} instantly.')
+            # Instant sync to the configured guild (uses GUILD_ID from .env)
+            GUILD_ID = os.getenv('GUILD_ID')
+            if GUILD_ID:
+                guild = discord.Object(id=int(GUILD_ID))
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                print(f'[SYNC]  Synced to guild {GUILD_ID} instantly.')
 
         except Exception as e:
             print(f'[SYNC]  Failed to sync commands: {e}')
