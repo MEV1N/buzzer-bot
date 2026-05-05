@@ -1,73 +1,122 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # database/db.py
-# Async SQLite database layer using aiosqlite.
-# Call init_db() once at startup to create all tables.
+# Async PostgreSQL database layer using asyncpg + Neon.
+#
+# Uses a connection pool so every cog can safely acquire its own connection
+# concurrently — no manual locking needed.
+#
+# Call init_db() once at startup; use get_db() as an async context manager.
 # ──────────────────────────────────────────────────────────────────────────────
 
-import aiosqlite
+import asyncpg
 import os
+from contextlib import asynccontextmanager
+from urllib.parse import urlparse, urlencode, urlunparse, parse_qs
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "buzzer.db")
+_pool: asyncpg.Pool | None = None
 
 
-async def get_db() -> aiosqlite.Connection:
-    """Opens and returns an aiosqlite connection with row factory enabled."""
-    db = await aiosqlite.connect(DB_PATH)
-    db.row_factory = aiosqlite.Row
-    return db
+def _clean_url(url: str) -> str:
+    """
+    Strip parameters that asyncpg doesn't recognise (e.g. channel_binding)
+    and remove sslmode so we can pass ssl='require' explicitly.
+    """
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    for key in ('channel_binding', 'sslmode'):
+        params.pop(key, None)
+    new_query = urlencode({k: v[0] for k, v in params.items()})
+    return urlunparse(parsed._replace(query=new_query))
 
 
 async def init_db():
-    """Creates all required tables if they do not already exist."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
+    """Opens the connection pool and creates all tables/indexes."""
+    global _pool
 
-        # ── Users: XP, level, role, cooldowns ─────────────────────────────
-        await db.execute("""
+    raw_url = os.environ.get('DATABASE_URL', '')
+    if not raw_url:
+        raise RuntimeError('DATABASE_URL environment variable is not set.')
+
+    _pool = await asyncpg.create_pool(
+        dsn=_clean_url(raw_url),
+        ssl='require',
+        min_size=1,
+        max_size=10,
+    )
+
+    async with _pool.acquire() as conn:
+        # ── Users ─────────────────────────────────────────────────────────────
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id     TEXT NOT NULL,
                 guild_id    TEXT NOT NULL,
-                xp          INTEGER DEFAULT 0,
-                level       INTEGER DEFAULT 0,
-                role        TEXT    DEFAULT 'member',  -- 'owner'|'admin'|'member'
-                last_xp_at  REAL    DEFAULT NULL,       -- Unix timestamp (seconds)
-                warn_count  INTEGER DEFAULT 0,
+                xp          INTEGER          DEFAULT 0,
+                level       INTEGER          DEFAULT 0,
+                role        TEXT             DEFAULT 'member',
+                last_xp_at  DOUBLE PRECISION DEFAULT NULL,
+                warn_count  INTEGER          DEFAULT 0,
                 PRIMARY KEY (user_id, guild_id)
             )
         """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_guild_xp
+            ON users (guild_id, xp DESC)
+        """)
 
-        # ── Tasks ──────────────────────────────────────────────────────────
-        await db.execute("""
+        # ── Tasks ─────────────────────────────────────────────────────────────
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
-                task_id           TEXT PRIMARY KEY,
-                guild_id          TEXT NOT NULL,
-                title             TEXT NOT NULL,
-                assigned_to       TEXT NOT NULL,         -- user_id
-                assigned_by       TEXT NOT NULL,         -- user_id
-                due_date          REAL NOT NULL,         -- Unix timestamp (seconds)
-                reminder_interval REAL NOT NULL,         -- seconds
-                next_reminder     REAL NOT NULL,         -- Unix timestamp (seconds)
-                reminder_count    INTEGER DEFAULT 0,
-                escalated         INTEGER DEFAULT 0,     -- 0|1 boolean
-                status            TEXT    DEFAULT 'pending', -- 'pending'|'completed'|'overdue'
-                proof             TEXT    DEFAULT NULL,
-                completed_at      REAL    DEFAULT NULL,
-                last_update       TEXT    DEFAULT NULL
+                task_id           TEXT             PRIMARY KEY,
+                guild_id          TEXT             NOT NULL,
+                title             TEXT             NOT NULL,
+                assigned_to       TEXT             NOT NULL,
+                assigned_by       TEXT             NOT NULL,
+                due_date          DOUBLE PRECISION NOT NULL,
+                reminder_interval DOUBLE PRECISION NOT NULL,
+                next_reminder     DOUBLE PRECISION NOT NULL,
+                reminder_count    INTEGER          DEFAULT 0,
+                escalated         INTEGER          DEFAULT 0,
+                status            TEXT             DEFAULT 'pending',
+                proof             TEXT             DEFAULT NULL,
+                completed_at      DOUBLE PRECISION DEFAULT NULL,
+                last_update       TEXT             DEFAULT NULL
             )
         """)
 
-        # ── Moderation log ─────────────────────────────────────────────────
-        await db.execute("""
+        # ── Moderation log ────────────────────────────────────────────────────
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS mod_logs (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id      TEXT NOT NULL,
-                action        TEXT NOT NULL,
-                moderator_id  TEXT NOT NULL,
-                target_id     TEXT NOT NULL,
-                reason        TEXT DEFAULT 'No reason provided.',
-                extra         TEXT DEFAULT NULL,         -- JSON string for extra fields
-                created_at    REAL DEFAULT (unixepoch('now'))
+                id            SERIAL           PRIMARY KEY,
+                guild_id      TEXT             NOT NULL,
+                action        TEXT             NOT NULL,
+                moderator_id  TEXT             NOT NULL,
+                target_id     TEXT             NOT NULL,
+                reason        TEXT             DEFAULT 'No reason provided.',
+                extra         TEXT             DEFAULT NULL,
+                created_at    DOUBLE PRECISION DEFAULT extract(epoch from now())
             )
         """)
 
-        await db.commit()
+
+async def close_db():
+    """Closes the connection pool gracefully (call on bot shutdown)."""
+    global _pool
+    if _pool is not None:
+        await _pool.close()
+        _pool = None
+
+
+@asynccontextmanager
+async def get_db():
+    """
+    Async context manager that acquires a connection from the pool.
+
+    Usage:
+        async with get_db() as db:
+            await db.execute(...)
+            row = await db.fetchrow(...)
+    """
+    if _pool is None:
+        raise RuntimeError('Database not initialised — call await init_db() first.')
+    async with _pool.acquire() as conn:
+        yield conn

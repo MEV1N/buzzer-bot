@@ -1,10 +1,10 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # cogs/tasks.py
 # Task management system with:
-#   - /task assign  — assign a task to a user
-#   - /task update  — post a status update on a task
-#   - /task complete — mark as done with proof
-#   - /task my      — list all your tasks
+#   - /bztask assign  — assign a task to a user
+#   - /bztask update  — post a status update on a task
+#   - /bztask complete — mark as done with proof
+#   - /bztask my      — list all your tasks
 #
 # Background reminder scheduler:
 #   - Runs every REMINDER_INTERVAL_SECS seconds
@@ -46,11 +46,11 @@ class Tasks(commands.Cog):
     def cog_unload(self):
         self.reminder_loop.cancel()
 
-    # ── /task group ───────────────────────────────────────────────────────────
+    # ── /bztask group ─────────────────────────────────────────────────────────
 
     task_group = app_commands.Group(name='bztask', description='Task management commands.')
 
-    # ── /task assign ──────────────────────────────────────────────────────────
+    # ── /bztask assign ────────────────────────────────────────────────────────
 
     @task_group.command(name='assign', description='Assign a task to a user. [Admin+]')
     @app_commands.describe(
@@ -93,31 +93,26 @@ class Tasks(commands.Cog):
         due_ts   = now + due_secs
         task_id  = _make_task_id()
 
-        async with await get_db() as db:
+        async with get_db() as db:
             await db.execute(
                 """
                 INSERT INTO tasks
                     (task_id, guild_id, title, assigned_to, assigned_by,
                      due_date, reminder_interval, next_reminder)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
-                (
-                    task_id,
-                    str(interaction.guild_id),
-                    title,
-                    str(user.id),
-                    str(interaction.user.id),
-                    due_ts,
-                    remind_secs,
-                    now + remind_secs,
-                ),
+                task_id,
+                str(interaction.guild_id),
+                title,
+                str(user.id),
+                str(interaction.user.id),
+                due_ts,
+                remind_secs,
+                now + remind_secs,
             )
-            await db.commit()
-
-            async with db.execute(
-                'SELECT * FROM tasks WHERE task_id = ?', (task_id,)
-            ) as cur:
-                row = dict(await cur.fetchone())
+            row = dict(await db.fetchrow(
+                'SELECT * FROM tasks WHERE task_id = $1', task_id
+            ))
 
         # DM the assigned user
         try:
@@ -129,7 +124,7 @@ class Tasks(commands.Cog):
             embed.add_field(name='Title',     value=title,                                   inline=False)
             embed.add_field(name='Due',       value=f'<t:{int(due_ts)}:F>  (<t:{int(due_ts)}:R>)', inline=False)
             embed.add_field(name='Reminders', value=f'Every {format_duration(remind_secs)}', inline=True)
-            embed.set_footer(text='Use /task complete <taskId> to mark it done with proof.')
+            embed.set_footer(text='Use /bztask complete <taskId> to mark it done with proof.')
             await user.send(embed=embed)
         except discord.HTTPException:
             pass
@@ -142,7 +137,7 @@ class Tasks(commands.Cog):
             ephemeral=True,
         )
 
-    # ── /task update ──────────────────────────────────────────────────────────
+    # ── /bztask update ────────────────────────────────────────────────────────
 
     @task_group.command(name='update', description='Post a status update on your task.')
     @app_commands.describe(task_id='Your task ID', message='Status update message')
@@ -153,11 +148,10 @@ class Tasks(commands.Cog):
         gid = str(interaction.guild_id)
         uid = str(interaction.user.id)
 
-        async with await get_db() as db:
-            async with db.execute(
-                'SELECT * FROM tasks WHERE task_id = ? AND guild_id = ?', (tid, gid)
-            ) as cur:
-                row = await cur.fetchone()
+        async with get_db() as db:
+            row = await db.fetchrow(
+                'SELECT * FROM tasks WHERE task_id = $1 AND guild_id = $2', tid, gid
+            )
 
             if not row:
                 return await interaction.followup.send(
@@ -178,13 +172,10 @@ class Tasks(commands.Cog):
                 )
 
             await db.execute(
-                'UPDATE tasks SET last_update = ? WHERE task_id = ? AND guild_id = ?',
-                (message, tid, gid),
+                'UPDATE tasks SET last_update = $1 WHERE task_id = $2 AND guild_id = $3',
+                message, tid, gid,
             )
-            await db.commit()
-
-            async with db.execute('SELECT * FROM tasks WHERE task_id = ?', (tid,)) as cur:
-                updated = dict(await cur.fetchone())
+            updated = dict(await db.fetchrow('SELECT * FROM tasks WHERE task_id = $1', tid))
 
         await interaction.followup.send(
             embed=success_embed('Task Updated', f'Task `{tid}` update recorded.'),
@@ -202,7 +193,7 @@ class Tasks(commands.Cog):
         except (discord.HTTPException, ValueError):
             pass
 
-    # ── /task complete ────────────────────────────────────────────────────────
+    # ── /bztask complete ──────────────────────────────────────────────────────
 
     @task_group.command(name='complete', description='Mark a task as completed. Proof required.')
     @app_commands.describe(task_id='Your task ID', proof='Image URL or attachment URL as proof')
@@ -220,11 +211,10 @@ class Tasks(commands.Cog):
                 ephemeral=True,
             )
 
-        async with await get_db() as db:
-            async with db.execute(
-                'SELECT * FROM tasks WHERE task_id = ? AND guild_id = ?', (tid, gid)
-            ) as cur:
-                row = await cur.fetchone()
+        async with get_db() as db:
+            row = await db.fetchrow(
+                'SELECT * FROM tasks WHERE task_id = $1 AND guild_id = $2', tid, gid
+            )
 
             if not row:
                 return await interaction.followup.send(
@@ -245,12 +235,12 @@ class Tasks(commands.Cog):
             await db.execute(
                 """
                 UPDATE tasks
-                SET status = 'completed', proof = ?, completed_at = ?, last_update = ?
-                WHERE task_id = ? AND guild_id = ?
+                SET status = 'completed', proof = $1, completed_at = $2, last_update = $3
+                WHERE task_id = $4 AND guild_id = $5
                 """,
-                (proof, now, 'Completed by assignee', tid, gid),
+                proof, now, 'Completed by assignee', tid, gid,
             )
-            await db.commit()
+            row = dict(row)  # snapshot before connection closes
 
         # Award XP
         xp_result = await award_task_xp(uid, gid, is_late)
@@ -286,7 +276,7 @@ class Tasks(commands.Cog):
         except (discord.HTTPException, ValueError):
             pass
 
-    # ── /task my ─────────────────────────────────────────────────────────────
+    # ── /bztask my ────────────────────────────────────────────────────────────
 
     @task_group.command(name='my', description='List all tasks assigned to you.')
     async def my(self, interaction: discord.Interaction):
@@ -295,12 +285,13 @@ class Tasks(commands.Cog):
         uid = str(interaction.user.id)
         gid = str(interaction.guild_id)
 
-        async with await get_db() as db:
-            async with db.execute(
-                'SELECT * FROM tasks WHERE assigned_to = ? AND guild_id = ? ORDER BY due_date ASC',
-                (uid, gid),
-            ) as cur:
-                rows = [dict(r) for r in await cur.fetchall()]
+        async with get_db() as db:
+            records = await db.fetch(
+                'SELECT * FROM tasks WHERE assigned_to = $1 AND guild_id = $2 ORDER BY due_date ASC',
+                uid, gid,
+            )
+
+        rows = [dict(r) for r in records]
 
         if not rows:
             return await interaction.followup.send(
@@ -321,34 +312,32 @@ class Tasks(commands.Cog):
         now = time.time()
 
         try:
-            async with await get_db() as db:
-                # All pending tasks whose next_reminder is due
-                async with db.execute(
+            async with get_db() as db:
+                records = await db.fetch(
                     """
                     SELECT * FROM tasks
-                    WHERE status = 'pending' AND next_reminder <= ?
+                    WHERE status = 'pending' AND next_reminder <= $1
                     """,
-                    (now,),
-                ) as cur:
-                    due_tasks = [dict(r) for r in await cur.fetchall()]
+                    now,
+                )
+                due_tasks = [dict(r) for r in records]
 
                 for task in due_tasks:
                     # Mark overdue if past due date
                     if now > task['due_date']:
                         await db.execute(
-                            "UPDATE tasks SET status = 'overdue' WHERE task_id = ?",
-                            (task['task_id'],),
+                            "UPDATE tasks SET status = 'overdue' WHERE task_id = $1",
+                            task['task_id'],
                         )
-                        await db.commit()
                         await self._send_reminder(task, overdue=True)
                         continue
 
                     # Send reminder DM
                     await self._send_reminder(task, overdue=False)
 
-                    new_count    = task['reminder_count'] + 1
-                    next_remind  = now + task['reminder_interval']
-                    escalated    = task['escalated']
+                    new_count   = task['reminder_count'] + 1
+                    next_remind = now + task['reminder_interval']
+                    escalated   = task['escalated']
 
                     # Escalate if too many misses
                     if new_count >= ESCALATION_THRESHOLD and not escalated:
@@ -358,12 +347,11 @@ class Tasks(commands.Cog):
                     await db.execute(
                         """
                         UPDATE tasks
-                        SET reminder_count = ?, next_reminder = ?, escalated = ?
-                        WHERE task_id = ?
+                        SET reminder_count = $1, next_reminder = $2, escalated = $3
+                        WHERE task_id = $4
                         """,
-                        (new_count, next_remind, escalated, task['task_id']),
+                        new_count, next_remind, escalated, task['task_id'],
                     )
-                    await db.commit()
 
         except Exception as exc:
             print(f'[TASKS] Scheduler error: {exc}')
@@ -382,7 +370,7 @@ class Tasks(commands.Cog):
                     '🔴  Task OVERDUE',
                     (
                         f"Your task **`{task['task_id']}`** — _{task['title']}_ — is **overdue**!\n"
-                        f"Please complete it immediately using `/task complete`."
+                        f"Please complete it immediately using `/bztask complete`."
                     ),
                 )
             else:
@@ -390,7 +378,7 @@ class Tasks(commands.Cog):
                     '⏰  Task Reminder',
                     (
                         f"Reminder: Task **`{task['task_id']}`** — _{task['title']}_ — is still **pending**.\n"
-                        f"Please update or complete it using `/task complete`."
+                        f"Please update or complete it using `/bztask complete`."
                     ),
                 )
 

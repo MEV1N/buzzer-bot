@@ -4,7 +4,7 @@
 #
 # XP gain: 5–15 per message, 30-second cooldown.
 # Level formula: level = floor(0.1 * sqrt(xp))
-# Slash commands: /rank, /leaderboard
+# Slash commands: /bzrank, /bzleaderboard
 # ──────────────────────────────────────────────────────────────────────────────
 
 import discord
@@ -35,17 +35,16 @@ async def _ensure_user(db, user_id: str, guild_id: str):
     role = 'owner' if user_id == owner_id else 'member'
     await db.execute(
         """
-        INSERT OR IGNORE INTO users (user_id, guild_id, role)
-        VALUES (?, ?, ?)
+        INSERT INTO users (user_id, guild_id, role)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, guild_id) DO NOTHING
         """,
-        (user_id, guild_id, role),
+        user_id, guild_id, role,
     )
-    await db.commit()
-    async with db.execute(
-        'SELECT * FROM users WHERE user_id = ? AND guild_id = ?',
-        (user_id, guild_id),
-    ) as cur:
-        return await cur.fetchone()
+    return await db.fetchrow(
+        'SELECT * FROM users WHERE user_id = $1 AND guild_id = $2',
+        user_id, guild_id,
+    )
 
 
 class XP(commands.Cog):
@@ -66,7 +65,7 @@ class XP(commands.Cog):
         uid = str(message.author.id)
         gid = str(message.guild.id)
 
-        async with await get_db() as db:
+        async with get_db() as db:
             user = await _ensure_user(db, uid, gid)
 
             # Cooldown check
@@ -82,12 +81,11 @@ class XP(commands.Cog):
             await db.execute(
                 """
                 UPDATE users
-                SET xp = ?, level = ?, last_xp_at = ?
-                WHERE user_id = ? AND guild_id = ?
+                SET xp = $1, level = $2, last_xp_at = $3
+                WHERE user_id = $4 AND guild_id = $5
                 """,
-                (new_xp, new_level, now, uid, gid),
+                new_xp, new_level, now, uid, gid,
             )
-            await db.commit()
 
         # Level-up notification
         if new_level > old_level:
@@ -101,7 +99,7 @@ class XP(commands.Cog):
             except discord.HTTPException:
                 pass
 
-    # ── /rank ─────────────────────────────────────────────────────────────────
+    # ── /bzrank ───────────────────────────────────────────────────────────────
 
     @app_commands.command(name='bzrank', description="Check your XP rank (or another user's).")
     @app_commands.describe(user='The user to check (defaults to you)')
@@ -117,15 +115,14 @@ class XP(commands.Cog):
         uid = str(target.id)
         gid = str(interaction.guild_id)
 
-        async with await get_db() as db:
+        async with get_db() as db:
             row = await _ensure_user(db, uid, gid)
 
             # Count users with more XP → rank
-            async with db.execute(
-                'SELECT COUNT(*) as cnt FROM users WHERE guild_id = ? AND xp > ?',
-                (gid, row['xp']),
-            ) as cur:
-                rank_row = await cur.fetchone()
+            rank_row = await db.fetchrow(
+                'SELECT COUNT(*) AS cnt FROM users WHERE guild_id = $1 AND xp > $2',
+                gid, row['xp'],
+            )
 
         rank = (rank_row['cnt'] + 1) if rank_row else 1
         member = interaction.guild.get_member(target.id) or target
@@ -134,7 +131,7 @@ class XP(commands.Cog):
             embed=rank_embed(member, row['xp'], row['level'], rank)
         )
 
-    # ── /leaderboard ──────────────────────────────────────────────────────────
+    # ── /bzleaderboard ────────────────────────────────────────────────────────
 
     @app_commands.command(name='bzleaderboard', description='View the top XP earners in this server.')
     @app_commands.describe(limit='How many users to show (1–20, default 10)')
@@ -143,12 +140,13 @@ class XP(commands.Cog):
         limit = max(1, min(20, limit))
         gid   = str(interaction.guild_id)
 
-        async with await get_db() as db:
-            async with db.execute(
-                'SELECT user_id, xp, level FROM users WHERE guild_id = ? ORDER BY xp DESC LIMIT ?',
-                (gid, limit),
-            ) as cur:
-                rows = [dict(r) for r in await cur.fetchall()]
+        async with get_db() as db:
+            records = await db.fetch(
+                'SELECT user_id, xp, level FROM users WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2',
+                gid, limit,
+            )
+
+        rows = [dict(r) for r in records]
 
         if not rows:
             return await interaction.followup.send(
@@ -165,38 +163,34 @@ class XP(commands.Cog):
 async def award_task_xp(user_id: str, guild_id: str, is_late: bool = False) -> dict:
     """Awards XP for completing a task. Returns updated xp/level info."""
     bonus = 20 if is_late else 50
-    async with await get_db() as db:
-        # Ensure row exists
+    async with get_db() as db:
         await db.execute(
-            'INSERT OR IGNORE INTO users (user_id, guild_id) VALUES (?, ?)',
-            (user_id, guild_id),
+            'INSERT INTO users (user_id, guild_id) VALUES ($1, $2) ON CONFLICT (user_id, guild_id) DO NOTHING',
+            user_id, guild_id,
         )
-        async with db.execute(
-            'SELECT xp, level FROM users WHERE user_id = ? AND guild_id = ?',
-            (user_id, guild_id),
-        ) as cur:
-            row = await cur.fetchone()
+        row = await db.fetchrow(
+            'SELECT xp, level FROM users WHERE user_id = $1 AND guild_id = $2',
+            user_id, guild_id,
+        )
 
         old_level = row['level']
         new_xp    = row['xp'] + bonus
         new_level = calculate_level(new_xp)
 
         await db.execute(
-            'UPDATE users SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?',
-            (new_xp, new_level, user_id, guild_id),
+            'UPDATE users SET xp = $1, level = $2 WHERE user_id = $3 AND guild_id = $4',
+            new_xp, new_level, user_id, guild_id,
         )
-        await db.commit()
 
     return {'xp': new_xp, 'level': new_level, 'leveled_up': new_level > old_level, 'bonus': bonus}
 
 
 async def reset_user_xp(user_id: str, guild_id: str):
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
-            'UPDATE users SET xp = 0, level = 0, last_xp_at = NULL WHERE user_id = ? AND guild_id = ?',
-            (user_id, guild_id),
+            'UPDATE users SET xp = 0, level = 0, last_xp_at = NULL WHERE user_id = $1 AND guild_id = $2',
+            user_id, guild_id,
         )
-        await db.commit()
 
 
 async def setup(bot: commands.Bot):

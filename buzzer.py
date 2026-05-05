@@ -123,9 +123,14 @@ class BuzzerBot(commands.Bot):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def main():
+    from database.db import close_db
     bot = BuzzerBot()
-    async with bot:
-        await bot.start(TOKEN)
+    try:
+        async with bot:
+            await bot.start(TOKEN)
+    finally:
+        await close_db()
+        print('[DB]    Database connection closed.')
 
 
 if __name__ == '__main__':

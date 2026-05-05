@@ -4,8 +4,8 @@
 #   owner → admin → member
 #
 # Slash commands:
-#   Admin+: /warn, /mute, /kick
-#   Owner:  /ban, /resetxp, /promote, /demote, /deletetask
+#   Admin+: /bzwarn, /bzmute, /bzkick
+#   Owner:  /bzban, /bzresetxp, /bzpromote, /bzdemote, /bzdeletetask
 # ──────────────────────────────────────────────────────────────────────────────
 
 import discord
@@ -41,24 +41,22 @@ async def get_role(user_id: str, guild_id: str) -> str:
     """Returns the user's bot role ('owner'|'admin'|'member')."""
     if user_id == os.getenv('OWNER_ID', ''):
         # Ensure owner row is correct in DB
-        async with await get_db() as db:
+        async with get_db() as db:
             await db.execute(
                 """
                 INSERT INTO users (user_id, guild_id, role)
-                VALUES (?, ?, 'owner')
-                ON CONFLICT(user_id, guild_id) DO UPDATE SET role = 'owner'
+                VALUES ($1, $2, 'owner')
+                ON CONFLICT (user_id, guild_id) DO UPDATE SET role = 'owner'
                 """,
-                (user_id, guild_id),
+                user_id, guild_id,
             )
-            await db.commit()
         return 'owner'
 
-    async with await get_db() as db:
-        async with db.execute(
-            'SELECT role FROM users WHERE user_id = ? AND guild_id = ?',
-            (user_id, guild_id),
-        ) as cur:
-            row = await cur.fetchone()
+    async with get_db() as db:
+        row = await db.fetchrow(
+            'SELECT role FROM users WHERE user_id = $1 AND guild_id = $2',
+            user_id, guild_id,
+        )
     return row['role'] if row else 'member'
 
 
@@ -77,22 +75,19 @@ async def log_action(
     extra: dict | None = None,
 ):
     """Saves action to DB and posts to the configured log channel."""
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             """
             INSERT INTO mod_logs (guild_id, action, moderator_id, target_id, reason, extra)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6)
             """,
-            (
-                str(interaction.guild_id),
-                action,
-                str(interaction.user.id),
-                str(target.id),
-                reason,
-                json.dumps(extra) if extra else None,
-            ),
+            str(interaction.guild_id),
+            action,
+            str(interaction.user.id),
+            str(target.id),
+            reason,
+            json.dumps(extra) if extra else None,
         )
-        await db.commit()
 
     log_ch_id = os.getenv('LOG_CHANNEL_ID', '')
     if not log_ch_id:
@@ -136,16 +131,15 @@ class Moderation(commands.Cog):
                 embed=error_embed('🛡️ The Owner is immune to moderation actions.'), ephemeral=True
             )
 
-        async with await get_db() as db:
+        async with get_db() as db:
             await db.execute(
                 """
                 INSERT INTO users (user_id, guild_id, warn_count)
-                VALUES (?, ?, 1)
-                ON CONFLICT(user_id, guild_id) DO UPDATE SET warn_count = warn_count + 1
+                VALUES ($1, $2, 1)
+                ON CONFLICT (user_id, guild_id) DO UPDATE SET warn_count = users.warn_count + 1
                 """,
-                (str(user.id), str(interaction.guild_id)),
+                str(user.id), str(interaction.guild_id),
             )
-            await db.commit()
 
         await log_action(interaction, 'warn', user, reason)
 
@@ -299,7 +293,6 @@ class Moderation(commands.Cog):
             return await interaction.followup.send(
                 embed=error_embed('Only the **Owner** can reset XP.'), ephemeral=True
             )
-        # Owner's own XP cannot be reset either (self-protection)
         if await is_protected_target(str(user.id), str(interaction.guild_id)) and str(user.id) != str(interaction.user.id):
             return await interaction.followup.send(
                 embed=error_embed('🛡️ Cannot reset the Owner\'s XP.'), ephemeral=True
@@ -328,15 +321,14 @@ class Moderation(commands.Cog):
         if user.bot:
             return await interaction.followup.send(embed=error_embed('Cannot promote bots.'), ephemeral=True)
 
-        async with await get_db() as db:
+        async with get_db() as db:
             await db.execute(
                 """
-                INSERT INTO users (user_id, guild_id, role) VALUES (?, ?, 'admin')
-                ON CONFLICT(user_id, guild_id) DO UPDATE SET role = 'admin'
+                INSERT INTO users (user_id, guild_id, role) VALUES ($1, $2, 'admin')
+                ON CONFLICT (user_id, guild_id) DO UPDATE SET role = 'admin'
                 """,
-                (str(user.id), str(interaction.guild_id)),
+                str(user.id), str(interaction.guild_id),
             )
-            await db.commit()
 
         await log_action(interaction, 'promote', user, 'Promoted to Core Admin')
 
@@ -363,15 +355,14 @@ class Moderation(commands.Cog):
                 embed=error_embed('🛡️ The Owner\'s role cannot be changed.'), ephemeral=True
             )
 
-        async with await get_db() as db:
+        async with get_db() as db:
             await db.execute(
                 """
-                INSERT INTO users (user_id, guild_id, role) VALUES (?, ?, 'member')
-                ON CONFLICT(user_id, guild_id) DO UPDATE SET role = 'member'
+                INSERT INTO users (user_id, guild_id, role) VALUES ($1, $2, 'member')
+                ON CONFLICT (user_id, guild_id) DO UPDATE SET role = 'member'
                 """,
-                (str(user.id), str(interaction.guild_id)),
+                str(user.id), str(interaction.guild_id),
             )
-            await db.commit()
 
         await log_action(interaction, 'demote', user, 'Demoted to Member')
 
@@ -392,12 +383,11 @@ class Moderation(commands.Cog):
                 embed=error_embed('Only the **Owner** can delete tasks.'), ephemeral=True
             )
 
-        async with await get_db() as db:
-            async with db.execute(
-                'SELECT task_id FROM tasks WHERE task_id = ? AND guild_id = ?',
-                (task_id.upper(), str(interaction.guild_id)),
-            ) as cur:
-                row = await cur.fetchone()
+        async with get_db() as db:
+            row = await db.fetchrow(
+                'SELECT task_id FROM tasks WHERE task_id = $1 AND guild_id = $2',
+                task_id.upper(), str(interaction.guild_id),
+            )
 
             if not row:
                 return await interaction.followup.send(
@@ -405,10 +395,9 @@ class Moderation(commands.Cog):
                 )
 
             await db.execute(
-                'DELETE FROM tasks WHERE task_id = ? AND guild_id = ?',
-                (task_id.upper(), str(interaction.guild_id)),
+                'DELETE FROM tasks WHERE task_id = $1 AND guild_id = $2',
+                task_id.upper(), str(interaction.guild_id),
             )
-            await db.commit()
 
         await log_action(interaction, 'deletetask', interaction.user, f'Deleted task {task_id}', {'Task ID': task_id})
 
