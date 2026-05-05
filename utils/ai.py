@@ -55,7 +55,7 @@ def _get_model() -> genai.GenerativeModel | None:
         _configured = True
 
     _model = genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-flash-latest',
         system_instruction=SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             temperature=0.95,      # Creative, unpredictable
@@ -90,4 +90,4 @@ async def ask_buzzer(prompt: str, fallback: str = '...') -> str:
         return text
     except Exception as e:
         print(f'[AI] Gemini error: {e}')
-        return f"{fallback}\n\n[DEBUG ERROR: {e}]"
+        return fallback
