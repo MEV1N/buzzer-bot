@@ -97,6 +97,7 @@ class Engagement(commands.Cog):
         gid = str(message.guild.id)
         now = time.time()
 
+
         # ── Track replies to lonely messages ──────────────────────────────────
         if message.reference and message.reference.message_id:
             ref_id = message.reference.message_id
@@ -147,6 +148,22 @@ class Engagement(commands.Cog):
                     )
         except Exception as e:
             print(f'[ENGAGEMENT] DB error in on_message: {e}')
+
+        # ── Bot mentioned ─────────────────────────────────────────────────────
+        if self.bot.user in message.mentions:
+            name = message.author.display_name
+            clean_text = message.clean_content
+            tod_context = f" It's their first message of the day ({_time_of_day()})." if first_today else ""
+            prompt = (
+                f"'{name}' mentioned you in the server with the message: \"{clean_text}\". "
+                f"As Buzzer, reply directly to them.{tod_context} Be funny, short, in character. 1-2 sentences max."
+            )
+            reply = await ask_buzzer(prompt, fallback="You rang? I'm busy judging silently.")
+            try:
+                await message.reply(reply, mention_author=False)
+            except discord.HTTPException:
+                pass
+            return
 
         # ── First message of day → AI greeting ────────────────────────────────
         if first_today:
