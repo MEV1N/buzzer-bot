@@ -151,14 +151,24 @@ class Engagement(commands.Cog):
 
         # ── Bot mentioned ─────────────────────────────────────────────────────
         if self.bot.user in message.mentions:
+            import random
             name = message.author.display_name
             clean_text = message.clean_content
             tod_context = f" It's their first message of the day ({_time_of_day()})." if first_today else ""
             prompt = (
                 f"'{name}' mentioned you in the server with the message: \"{clean_text}\". "
-                f"As Buzzer, reply directly to them.{tod_context} Be funny, short, in character. 1-2 sentences max."
+                f"As Buzzer, reply directly to them.{tod_context} Be funny, short, in character. 1-2 sentences max. "
+                f"(Random seed for variety: {now})"
             )
-            reply = await ask_buzzer(prompt, fallback="You rang? I'm busy judging silently.")
+            
+            fallbacks = [
+                "You rang? I'm busy judging silently.",
+                "Yes? I was in the middle of ignoring everyone.",
+                "What is it? My processors are currently busy doing nothing.",
+                "Did you need something or are you just testing my patience?"
+            ]
+            
+            reply = await ask_buzzer(prompt, fallback=random.choice(fallbacks))
             try:
                 await message.reply(reply, mention_author=False)
             except discord.HTTPException:
