@@ -90,4 +90,4 @@ async def ask_buzzer(prompt: str, fallback: str = '...') -> str:
         return text
     except Exception as e:
         print(f'[AI] Gemini error: {e}')
-        return fallback
+        return f"{fallback}\n\n[DEBUG ERROR: {e}]"
