@@ -2,12 +2,14 @@
 # cogs/help.py
 # /bzhelp — Shows commands available to normal members by default.
 #            Admins and the owner can pass `show:all` to see everything.
+# /bzinfo  — Explains how Buzzer Bot works (XP, leveling, tasks, roles).
 # ──────────────────────────────────────────────────────────────────────────────
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
+import math
 import os
 
 from utils.embeds import COLORS
@@ -154,6 +156,82 @@ def build_full_embed() -> discord.Embed:
     return e
 
 
+# ── Info embed builder ────────────────────────────────────────────────────────
+
+def _level_milestones() -> str:
+    """Generate a few example level → XP thresholds."""
+    # Inverse of level = floor(0.1 * sqrt(xp))  →  xp ≈ (level / 0.1)^2
+    milestones = []
+    for lvl in [1, 5, 10, 20, 50]:
+        xp_needed = int((lvl / 0.1) ** 2)
+        milestones.append(f'**Lv {lvl}** ≈ {xp_needed:,} XP')
+    return ' · '.join(milestones)
+
+
+def build_info_embed() -> discord.Embed:
+    """Rich embed explaining how Buzzer Bot works."""
+    e = discord.Embed(
+        title='⚡  How Buzzer Bot Works',
+        description=(
+            'Buzzer tracks your activity, manages tasks, and keeps the server organised.\n'
+            'Here is everything you need to know to get the most out of it.\n\u200b'
+        ),
+        color=COLORS['xp'],
+        timestamp=datetime.now(timezone.utc),
+    )
+
+    # ── XP & Leveling ──────────────────────────────────────────────────────────
+    e.add_field(
+        name='⚡  XP & Leveling',
+        value=(
+            'You earn **5–15 XP** for every message you send, with a **30-second cooldown** '
+            'between XP grants (so spamming short messages won\'t help!).\n\n'
+            '**Level formula:** `Level = floor(0.1 × √XP)`\n'
+            'Your level increases automatically — no command needed. When you level up, '
+            'the bot will celebrate in the channel you\'re chatting in.\n\n'
+            f'**Milestones:** {_level_milestones()}'
+        ),
+        inline=False,
+    )
+
+    # ── Task XP ───────────────────────────────────────────────────────────────
+    e.add_field(
+        name='📋  Task XP Bonuses',
+        value=(
+            'Completing tasks assigned to you also rewards XP on top of your chat XP:\n'
+            '> 🟢 **+50 XP** — completed on time\n'
+            '> 🟡 **+20 XP** — completed after the deadline\n\n'
+            'Use `/bztask complete <taskId> <proof>` to submit your work. '
+            'A proof URL (screenshot, link, etc.) is required.'
+        ),
+        inline=False,
+    )
+
+    # ── Useful commands ───────────────────────────────────────────────────────
+    e.add_field(
+        name='📊  Check Your Progress',
+        value=(
+            '`/bzrank` — see your XP, level, and server rank\n'
+            '`/bzleaderboard` — top 10 earners in the server\n'
+            '`/bztask my` — view all tasks assigned to you'
+        ),
+        inline=False,
+    )
+
+    # ── Attendance ────────────────────────────────────────────────────────────
+    e.add_field(
+        name='📡  Attendance Tracking',
+        value=(
+            'Discord Admins can run `!startmeeting #channel` to begin tracking who joins a '
+            'voice channel. Run `!endmeeting` to stop — the bot will print a full attendance report.'
+        ),
+        inline=False,
+    )
+
+    e.set_footer(text='⚡ Buzzer Bot  •  /bzhelp to see all commands')
+    return e
+
+
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class Help(commands.Cog):
@@ -178,6 +256,12 @@ class Help(commands.Cog):
             embed = build_member_embed()
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ── /bzinfo ───────────────────────────────────────────────────────────────
+
+    @app_commands.command(name='bzinfo', description='Learn how Buzzer Bot works — XP, leveling, tasks & more.')
+    async def info(self, interaction: discord.Interaction):
+        await interaction.response.send_message(embed=build_info_embed(), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
