@@ -59,7 +59,6 @@ def _get_model() -> genai.GenerativeModel | None:
         system_instruction=SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             temperature=0.95,      # Creative, unpredictable
-            max_output_tokens=120, # Keep replies short
         ),
     )
     return _model
