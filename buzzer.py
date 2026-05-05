@@ -71,6 +71,10 @@ class BuzzerBot(commands.Bot):
             'cogs.moderation',
             'cogs.tasks',
             'cogs.help',
+            'cogs.engagement',
+            'cogs.voice_xp',
+            'cogs.brainstorm',
+            'cogs.profile',
         ]
         for cog in cogs:
             try:

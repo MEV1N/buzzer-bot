@@ -39,7 +39,9 @@ class Tasks(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._interval = int(os.getenv('REMINDER_INTERVAL_SECS', '60'))
+        # Read interval in DAYS, convert to seconds for the scheduler
+        days = float(os.getenv('REMINDER_INTERVAL_DAYS', '1'))
+        self._interval = int(days * 86400)  # 1 day = 86 400 seconds
         self.reminder_loop.change_interval(seconds=self._interval)
         self.reminder_loop.start()
 

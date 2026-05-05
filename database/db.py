@@ -97,6 +97,40 @@ async def init_db():
             )
         """)
 
+        # ── User activity (engagement / inactivity tracking) ──────────────────
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_activity (
+                user_id           TEXT             NOT NULL,
+                guild_id          TEXT             NOT NULL,
+                last_seen         DOUBLE PRECISION DEFAULT 0,
+                last_greeted_date TEXT             DEFAULT '',
+                streak            INTEGER          DEFAULT 0,
+                PRIMARY KEY (user_id, guild_id)
+            )
+        """)
+
+        # ── Voice sessions (voice XP tracking) ───────────────────────────────
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS voice_sessions (
+                user_id    TEXT             NOT NULL,
+                guild_id   TEXT             NOT NULL,
+                channel_id TEXT             NOT NULL,
+                join_time  DOUBLE PRECISION NOT NULL,
+                PRIMARY KEY (user_id, guild_id)
+            )
+        """)
+
+        # ── Brainstorm posts ──────────────────────────────────────────────────
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS brainstorm_posts (
+                id          SERIAL PRIMARY KEY,
+                guild_id    TEXT   NOT NULL,
+                message_id  TEXT   NOT NULL,
+                channel_id  TEXT   NOT NULL,
+                posted_date TEXT   NOT NULL
+            )
+        """)
+
 
 async def close_db():
     """Closes the connection pool gracefully (call on bot shutdown)."""

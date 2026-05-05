@@ -185,5 +185,28 @@ async def reset_user_xp(user_id: str, guild_id: str):
         )
 
 
+async def award_xp_raw(user_id: str, guild_id: str, amount: int) -> dict:
+    """Award a fixed XP amount (used by voice XP, brainstorm, etc.).
+    Returns {'xp': int, 'level': int, 'leveled_up': bool}.
+    """
+    async with get_db() as db:
+        await db.execute(
+            'INSERT INTO users (user_id, guild_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            user_id, guild_id,
+        )
+        row = await db.fetchrow(
+            'SELECT xp, level FROM users WHERE user_id = $1 AND guild_id = $2',
+            user_id, guild_id,
+        )
+        old_level = row['level']
+        new_xp    = row['xp'] + amount
+        new_level = calculate_level(new_xp)
+        await db.execute(
+            'UPDATE users SET xp = $1, level = $2 WHERE user_id = $3 AND guild_id = $4',
+            new_xp, new_level, user_id, guild_id,
+        )
+    return {'xp': new_xp, 'level': new_level, 'leveled_up': new_level > old_level}
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(XP(bot))

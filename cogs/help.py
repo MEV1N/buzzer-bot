@@ -29,6 +29,8 @@ ALL_COMMANDS = {
             ('/bzrank @user',        "Show another user's rank card.",      'member'),
             ('/bzleaderboard',       'Top 10 XP earners in this server.',   'member'),
             ('/bzleaderboard limit', 'Show top N users (1–20).',            'member'),
+            ('/bzprofile',           'View your full activity profile.',     'member'),
+            ('/bzprofile @user',     "View another member's profile.",      'member'),
         ],
     },
     'tasks': {
