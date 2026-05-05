@@ -12,16 +12,14 @@ from discord import app_commands
 from discord.ext import commands
 import math
 import random
-import time
 import os
 
 from database.db import get_db
 from utils.embeds import rank_embed, leaderboard_embed, success_embed, error_embed
 
 
-XP_MIN      = 5
-XP_MAX      = 15
-COOLDOWN_S  = 30   # seconds
+XP_MIN = 5
+XP_MAX = 15
 
 
 def calculate_level(xp: int) -> int:
@@ -61,17 +59,11 @@ class XP(commands.Cog):
         if not message.guild or message.author.bot or message.is_system():
             return
 
-        now = time.time()
         uid = str(message.author.id)
         gid = str(message.guild.id)
 
         async with get_db() as db:
             user = await _ensure_user(db, uid, gid)
-
-            # Cooldown check
-            last_xp = user['last_xp_at'] or 0.0
-            if now - last_xp < COOLDOWN_S:
-                return
 
             gain      = random.randint(XP_MIN, XP_MAX)
             old_level = user['level']
@@ -81,10 +73,10 @@ class XP(commands.Cog):
             await db.execute(
                 """
                 UPDATE users
-                SET xp = $1, level = $2, last_xp_at = $3
-                WHERE user_id = $4 AND guild_id = $5
+                SET xp = $1, level = $2
+                WHERE user_id = $3 AND guild_id = $4
                 """,
-                new_xp, new_level, now, uid, gid,
+                new_xp, new_level, uid, gid,
             )
 
         # Level-up notification
