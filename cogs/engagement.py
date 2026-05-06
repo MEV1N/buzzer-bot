@@ -90,19 +90,18 @@ class Engagement(commands.Cog):
                 await self._forward_to_owner(message)
             return
 
+        # ── Track replies to lonely messages ──────────────────────────────────
+        if message.reference and message.reference.message_id:
+            ref_id = message.reference.message_id
+            if ref_id in self._lonely:
+                self._lonely[ref_id]['replied'] = True
+
         if not message.guild or message.author.bot:
             return
 
         uid = str(message.author.id)
         gid = str(message.guild.id)
         now = time.time()
-
-
-        # ── Track replies to lonely messages ──────────────────────────────────
-        if message.reference and message.reference.message_id:
-            ref_id = message.reference.message_id
-            if ref_id in self._lonely:
-                self._lonely[ref_id]['replied'] = True
 
         # ── Register this message for lonely tracking ─────────────────────────
         if isinstance(message.channel, discord.TextChannel):
@@ -274,12 +273,11 @@ class Engagement(commands.Cog):
                 continue
             try:
                 msg = await channel.fetch_message(mid)
-                # Verify no human reply exists
+                # Verify no reply exists
                 async for m in channel.history(after=msg, limit=25):
                     if (
                         m.reference
                         and m.reference.message_id == mid
-                        and not m.author.bot
                     ):
                         break
                 else:
