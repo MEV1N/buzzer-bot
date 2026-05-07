@@ -245,8 +245,8 @@ class Engagement(commands.Cog):
             prompt = (
                 f"'{name}' said they're bored in the server chat. "
                 f"As Buzzer, reply in character. "
-                f"Maybe suggest /bzleaderboard, /bzrank, or /bztask my — or just talk about the boredom. "
-                f"1-2 sentences."
+                f"Maybe suggest /bzleaderboard or /bztask my — or just talk about the boredom. "
+                f"1-2 sentences. Do not mention /bzrank."
             )
             reply = await ask_buzzer(prompt, fallback=_FB_BORED)
             await message.reply(reply, mention_author=False)
