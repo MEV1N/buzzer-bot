@@ -152,11 +152,12 @@ class Engagement(commands.Cog):
         if self.bot.user in message.mentions:
             import random
             name = message.author.display_name
+            user_id = message.author.id
             clean_text = message.clean_content
             tod_context = f" It's their first message of the day ({_time_of_day()})." if first_today else ""
             prompt = (
-                f"'{name}' mentioned you in the server with the message: \"{clean_text}\". "
-                f"As Buzzer, reply directly to them.{tod_context} Keep it short and in character. 1-2 sentences max. "
+                f"User '{name}' (ID: {user_id}) mentioned you in the server with the message: \"{clean_text}\". "
+                f"As Buzzer, reply directly to them.{tod_context} You can ping them using <@{user_id}>. Keep it short and in character. 1-2 sentences max. "
                 f"(Random seed for variety: {now})"
             )
             
@@ -178,10 +179,11 @@ class Engagement(commands.Cog):
         if first_today:
             tod  = _time_of_day()
             name = message.author.display_name
+            user_id = message.author.id
             prompt = (
-                f"User '{name}' just sent their first message of the day. "
+                f"User '{name}' (ID: {user_id}) just sent their first message of the day. "
                 f"It is currently {tod} UTC. "
-                f"Greet them as Buzzer — short and in character."
+                f"Greet them as Buzzer — short and in character. You can ping them using <@{user_id}>."
             )
             reply = await ask_buzzer(prompt, fallback=_fallback_greeting())
             try:
@@ -203,10 +205,12 @@ class Engagement(commands.Cog):
         if rand_ch and message.channel.id == rand_ch:
             if now - self._wit_cd.get(uid, 0) >= WITTY_COOLDOWN:
                 if random.random() < WITTY_CHANCE:
+                    name = message.author.display_name
+                    user_id = message.author.id
                     prompt = (
                         f"React to this message in the #random channel as Buzzer. "
-                        f"Message from '{message.author.display_name}': \"{message.content[:200]}\". "
-                        f"Keep it short and in character. 1-2 sentences max."
+                        f"Message from '{name}' (ID: {user_id}): \"{message.content[:200]}\". "
+                        f"Keep it short and in character. 1-2 sentences max. You can ping them using <@{user_id}>."
                     )
                     reply = await ask_buzzer(prompt, fallback=_FB_WITTY)
                     try:
@@ -219,13 +223,14 @@ class Engagement(commands.Cog):
 
     async def _keyword_reply(self, message: discord.Message, content: str) -> bool:
         name = message.author.display_name
+        user_id = message.author.id
 
         if 'attendance' in content:
             prompt = (
-                f"'{name}' mentioned 'attendance' in the server. "
+                f"User '{name}' (ID: {user_id}) mentioned 'attendance' in the server. "
                 f"As Buzzer, respond shortly in character and let them know attendance is tracked live "
                 f"during voice meetings — an admin runs !startmeeting / !endmeeting. "
-                f"1-2 sentences."
+                f"1-2 sentences. You can ping them using <@{user_id}>."
             )
             reply = await ask_buzzer(prompt, fallback=_FB_ATTEND)
             await message.reply(reply, mention_author=False)
@@ -233,9 +238,9 @@ class Engagement(commands.Cog):
 
         if 'deadline' in content:
             prompt = (
-                f"'{name}' mentioned 'deadline' in the server chat. "
+                f"User '{name}' (ID: {user_id}) mentioned 'deadline' in the server chat. "
                 f"As Buzzer, reply in character about deadlines and mention they can check "
-                f"their tasks with /bztask my. Keep it short."
+                f"their tasks with /bztask my. Keep it short. You can ping them using <@{user_id}>."
             )
             reply = await ask_buzzer(prompt, fallback=_FB_DEADLINE)
             await message.reply(reply, mention_author=False)
@@ -243,10 +248,10 @@ class Engagement(commands.Cog):
 
         if 'bored' in content:
             prompt = (
-                f"'{name}' said they're bored in the server chat. "
+                f"User '{name}' (ID: {user_id}) said they're bored in the server chat. "
                 f"As Buzzer, reply in character. "
                 f"Maybe suggest /bzleaderboard or /bztask my — or just talk about the boredom. "
-                f"1-2 sentences. Do not mention /bzrank."
+                f"1-2 sentences. Do not mention /bzrank. You can ping them using <@{user_id}>."
             )
             reply = await ask_buzzer(prompt, fallback=_FB_BORED)
             await message.reply(reply, mention_author=False)
@@ -286,17 +291,18 @@ class Engagement(commands.Cog):
                     author_name = channel.guild.get_member(data['author_id'])
                     name = author_name.display_name if author_name else 'someone'
 
+                    user_id = data['author_id']
                     if original:
                         prompt = (
-                            f"'{name}' sent a message 30 minutes ago in a Discord server and NOBODY replied. "
+                            f"User '{name}' (ID: {user_id}) sent a message 30 minutes ago in a Discord server and NOBODY replied. "
                             f"Their message: \"{original}\". "
                             f"As Buzzer, swoop in and reply in character about the awkward silence, "
-                            f"but also engage with what they said. 1-2 sentences."
+                            f"but also engage with what they said. 1-2 sentences. You can ping them using <@{user_id}>."
                         )
                     else:
                         prompt = (
-                            f"'{name}' sent a message 30 minutes ago and nobody replied. "
-                            f"As Buzzer, swoop in with an in-character comment about the silence. 1-2 sentences."
+                            f"User '{name}' (ID: {user_id}) sent a message 30 minutes ago and nobody replied. "
+                            f"As Buzzer, swoop in with an in-character comment about the silence. 1-2 sentences. You can ping them using <@{user_id}>."
                         )
 
                     reply = await ask_buzzer(prompt, fallback=_FB_LONELY)
