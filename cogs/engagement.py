@@ -251,9 +251,32 @@ class Engagement(commands.Cog):
                 f"User '{name}' (ID: {user_id}) said they're bored in the server chat. "
                 f"As Buzzer, reply in character. "
                 f"Maybe suggest /bzleaderboard or /bztask my — or just talk about the boredom. "
-                f"1-2 sentences. Do not mention /bzrank. You can ping them using <@{user_id}>."
+                f"1-2 sentences. You can ping them using <@{user_id}>."
             )
             reply = await ask_buzzer(prompt, fallback=_FB_BORED)
+            await message.reply(reply, mention_author=False)
+            return True
+
+        if 'rank' in content or 'leaderboard' in content:
+            async with get_db() as db:
+                records = await db.fetch(
+                    'SELECT user_id, xp, level FROM users WHERE guild_id = $1 ORDER BY xp DESC LIMIT 3',
+                    str(message.guild.id)
+                )
+            if records:
+                top_users = ", ".join([f"<@{r['user_id']}>" for r in records])
+                prompt = (
+                    f"User '{name}' (ID: {user_id}) mentioned 'rank' or 'leaderboard'. "
+                    f"The current top 3 users on the leaderboard are: {top_users}. "
+                    f"As Buzzer, reply in character, mention these top users by their <@id>, and maybe tease the person asking. "
+                    f"1-2 sentences. You can ping users using their <@id> format."
+                )
+            else:
+                prompt = (
+                    f"User '{name}' (ID: {user_id}) mentioned 'rank' or 'leaderboard', but nobody has XP yet. "
+                    f"As Buzzer, reply in character about how everyone is at zero. 1-2 sentences."
+                )
+            reply = await ask_buzzer(prompt, fallback="Check the leaderboard with `/bzleaderboard`.")
             await message.reply(reply, mention_author=False)
             return True
 
@@ -349,10 +372,16 @@ class Engagement(commands.Cog):
                 )
                 if ch:
                     try:
-                        await ch.send(
-                            "👀 Looks like someone's been missing from the server lately. "
-                            "You know who you are. We notice these things. 🫡"
+                        prompt = (
+                            f"User '{name}' (ID: {uid}) hasn't been active in the server for {INACTIVITY_DAYS}+ days. "
+                            f"As Buzzer, write a short, in-character public announcement calling them out or checking on them. "
+                            f"1-2 sentences. You MUST mention them using <@{uid}>."
                         )
+                        reply = await ask_buzzer(
+                            prompt,
+                            fallback=f"👀 <@{uid}> hasn't been seen in {INACTIVITY_DAYS} days. We notice these things. 🫡"
+                        )
+                        await ch.send(reply)
                     except discord.HTTPException:
                         pass
 
